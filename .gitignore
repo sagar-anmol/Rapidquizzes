@@ -8,3 +8,6 @@ dev-server*.log
 npm-debug.log*
 dev-server.err.log
 dev-server.log
+
+*.log
+*.err.log
