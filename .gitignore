@@ -6,3 +6,4 @@ dist
 data/sets.json
 dev-server*.log
 npm-debug.log*
+dev-server.err.log
