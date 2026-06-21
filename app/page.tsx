@@ -467,8 +467,8 @@ export default function Home() {
         <section className="adminScreen">
           <div className="adminHero">
             <div>
-              <h2>Question Set Management Workspace</h2>
-              <p className="muted">Upload, review, and publish quiz sets directly to MongoDB Atlas or local fallback.</p>
+              <h2>Management</h2>
+              <p className="muted">made to make life easy</p>
             </div>
             {adminToken && <span className="adminBadge">Authenticated</span>}
           </div>
