@@ -290,7 +290,7 @@ export default function QuizEngine({
             <button className="mobileCloseButton" onClick={() => setMobileMenuOpen(false)} style={{ display: "none", background: "none", border: "none", fontSize: "1.2rem", color: "#71717a", cursor: "pointer" }}>✕</button>
           </div>
 
-          <div style={{ flex: 1, overflowY: "auto", maxH: "380px" }}>
+          <div style={{ flex: 1, overflowY: "auto", maxHeight: "380px" }}>
             <div className="paletteGrid" style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "8px" }}>
               {selectedSet.questions.map((question, index) => {
                 let btnClass = "paletteButton";
