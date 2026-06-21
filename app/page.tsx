@@ -215,7 +215,7 @@ export default function Home() {
 
   function startPersonalRecallTest() {
     const pool = JSON.parse(localStorage.getItem("quiz.weakPool") || "[]");
-    if (pool.length === 0) return;
+    if (pool.length < 30) return; 
 
     const shuffledPool = [...pool];
     for (let i = shuffledPool.length - 1; i > 0; i--) {
@@ -232,7 +232,7 @@ export default function Home() {
       category: "Personal Revision",
       tags: ["Active Recall", "Spaced Repetition"],
       questions: randomizedSelection,
-      createdAt: new Date().toISOString() // Fixed property injection
+      createdAt: new Date().toISOString()
     };
 
     setSets((prev) => {
@@ -309,24 +309,34 @@ export default function Home() {
     localStorage.setItem(attemptKey, JSON.stringify(nextAttempts));
     setIsSubmitted(true);
 
-    const weakQuestionsCollected = selectedSet.questions.filter((question, index) => {
-      const userAnswer = answers[index];
-      const isUnattempted = userAnswer === null || typeof userAnswer === "undefined";
-      const isWrong = !isUnattempted && userAnswer !== question.correctAnswerIndex;
-      return isUnattempted || isWrong;
-    });
+    let currentPool = JSON.parse(localStorage.getItem("quiz.weakPool") || "[]");
 
-    if (weakQuestionsCollected.length > 0) {
-      const existingPool = JSON.parse(localStorage.getItem("quiz.weakPool") || "[]");
-      
-      const uniqueNewQuestions = weakQuestionsCollected.filter(
-        (newQ) => !existingPool.some((oldQ: any) => oldQ.question === newQ.question)
-      );
+    if (selectedSet.id === "synthetic-personalized-recall-pool") {
+      selectedSet.questions.forEach((question, index) => {
+        const userAnswer = answers[index];
+        const isCorrect = userAnswer === question.correctAnswerIndex;
+        if (isCorrect) {
+          currentPool = currentPool.filter((q: any) => q.question !== question.question);
+        }
+      });
+      localStorage.setItem("quiz.weakPool", JSON.stringify(currentPool));
+    } else {
+      const weakQuestionsCollected = selectedSet.questions.filter((question, index) => {
+        const userAnswer = answers[index];
+        const isUnattempted = userAnswer === null || typeof userAnswer === "undefined";
+        const isWrong = !isUnattempted && userAnswer !== question.correctAnswerIndex;
+        return isUnattempted || isWrong;
+      });
 
-      const updatedPool = [...uniqueNewQuestions, ...existingPool];
-      const cappedPool = updatedPool.slice(0, 30);
+      if (weakQuestionsCollected.length > 0) {
+        const uniqueNewQuestions = weakQuestionsCollected.filter(
+          (newQ) => !currentPool.some((oldQ: any) => oldQ.question === newQ.question)
+        );
 
-      localStorage.setItem("quiz.weakPool", JSON.stringify(cappedPool));
+        const updatedPool = [...uniqueNewQuestions, ...currentPool];
+        const cappedPool = updatedPool.slice(0, 30);
+        localStorage.setItem("quiz.weakPool", JSON.stringify(cappedPool));
+      }
     }
   }
 
@@ -390,7 +400,7 @@ export default function Home() {
         <section className="shell">
           {viewMode === "select" ? (
             <>
-              {/* Highlighted Recall Banner Component with Dynamic Glow Animation */}
+              {/* Conditional Active Recall Banner Panel */}
               {weakPoolCount > 0 && (
                 <div className="recallBanner highlightRecallGlow" style={{
                   background: "linear-gradient(135deg, rgba(147, 51, 234, 0.08) 0%, rgba(236, 72, 153, 0.08) 100%)",
@@ -406,30 +416,35 @@ export default function Home() {
                 }}>
                   <div>
                     <h3 style={{ margin: 0, fontSize: "1.15rem", fontWeight: "800", color: "#9333ea", display: "flex", alignItems: "center", gap: "8px" }}>
-                      ⚡ Smart Active Revision Available
+                      ⚡ Smart Active Revision Tracker
                     </h3>
                     <p style={{ margin: "6px 0 0", fontSize: "0.88rem", fontWeight: "500", color: "#6b7280" }}>
-                      Reviewing your personal mistake pool (<b>{weakPoolCount}/30</b> saved). Ready to spin a fast 15-question random challenge session?
+                      {weakPoolCount < 30 ? (
+                        <>Accumulating historical mistakes (<b>{weakPoolCount}/30</b> saved). Challenge locks down until full metrics pack matches.</>
+                      ) : (
+                        <>🎯 <b>Mistake deck full!</b> Active Recall set compiled successfully and ready for challenge.</>
+                      )}
                     </p>
                   </div>
                   <button 
                     onClick={startPersonalRecallTest}
+                    disabled={weakPoolCount < 30}
                     style={{
-                      background: "linear-gradient(135deg, #9333ea 0%, #ec4899 100%)",
-                      color: "#ffffff",
+                      background: weakPoolCount < 30 ? "#d4d4d8" : "linear-gradient(135deg, #9333ea 0%, #ec4899 100%)",
+                      color: weakPoolCount < 30 ? "#71717a" : "#ffffff",
                       border: "none",
                       padding: "12px 20px",
                       borderRadius: "10px",
                       fontSize: "0.88rem",
                       fontWeight: "700",
-                      cursor: "pointer",
-                      boxShadow: "0 4px 14px rgba(147, 51, 234, 0.4)",
+                      cursor: weakPoolCount < 30 ? "not-allowed" : "pointer",
+                      boxShadow: weakPoolCount < 30 ? "none" : "0 4px 14px rgba(147, 51, 234, 0.4)",
                       transition: "transform 0.15s ease"
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.03)"}
-                    onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                    onMouseEnter={(e) => { if (weakPoolCount >= 30) e.currentTarget.style.transform = "scale(1.03)"; }}
+                    onMouseLeave={(e) => { if (weakPoolCount >= 30) e.currentTarget.style.transform = "scale(1)"; }}
                   >
-                    Start Recall Challenge ➔
+                    {weakPoolCount < 30 ? `Locked (${weakPoolCount}/30)` : "Start Recall Challenge ➔"}
                   </button>
                 </div>
               )}
@@ -471,7 +486,7 @@ export default function Home() {
                 <div className="adminActions"><button onClick={uploadJson}>Publish Set</button></div>
               </section>
               <aside className="adminList">
-                {adminSets.map((set) => <div className="attempt" key={set.id}><span>{set.title}</span>export default function Home() <strong>{set.questions.length}</strong></div>)}
+                {adminSets.map((set) => <div className="attempt" key={set.id}><span>{set.title}</span> <strong>{set.questions.length}</strong></div>)}
                 <div className="pager">
                   <button disabled={adminPage <= 1} onClick={() => loadAdminSets(adminPage - 1)}>Prev</button>
                   <span>{adminPage}/{adminTotalPages}</span>
@@ -518,7 +533,7 @@ export default function Home() {
       {/* Embedded Global Styles injecting CSS keyframes for highlighting animations */}
       <style dangerouslySetInnerHTML={{ __html: `
         .highlightRecallGlow {
-          border: 2px solid #9333ea !important;
+          border: 2px solid #e4e4e7;
           animation: animatedRecallBorderGlow 3s infinite ease-in-out;
         }
 
@@ -533,7 +548,7 @@ export default function Home() {
           }
           50% {
             border-color: #ec4899;
-            box-shadow: 0 0 16px rgba(236, 72, 153, 0.4);
+            box-shadow: 0 0 16px rgba(236, 72, 153, 0.3);
           }
           100% {
             border-color: #9333ea;
