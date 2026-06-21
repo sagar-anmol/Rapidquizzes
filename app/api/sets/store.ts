@@ -2,12 +2,14 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { hasMongoConfig, quizSetsCollection } from "./mongo";
 
+// 1. Updated Type Definitions to match your preferred schema
 export type QuizQuestion = {
   id: string;
   question: string;
   options: string[];
-  answer: number;
+  correctAnswerIndex: number; // Changed from answer
   explanation?: string;
+  category?: string;          // Added per-question category support
 };
 
 export type QuizSet = {
@@ -15,6 +17,8 @@ export type QuizSet = {
   title: string;
   description?: string;
   category?: string;
+  tags?: string[];            // Added tags support
+  totalQuestions?: number;    // Added total questions counter support
   createdAt: string;
   questions: QuizQuestion[];
 };
@@ -22,26 +26,31 @@ export type QuizSet = {
 const dataDir = path.join(process.cwd(), "data");
 const dataFile = path.join(dataDir, "sets.json");
 
+// 2. Updated Starter Sets to follow the new structural schema
 const starterSets: QuizSet[] = [
   {
     id: "starter-current-affairs",
     title: "Starter Current Affairs Set",
     description: "A tiny sample set so the app works before admin uploads.",
-    category: "General",
+    category: "Current Affairs",
+    tags: ["General", "App"],
+    totalQuestions: 2,
     createdAt: new Date().toISOString(),
     questions: [
       {
         id: "q1",
         question: "Which feature lets this app keep quiz sets available without internet?",
         options: ["Server cookies", "Offline cache", "Password reset", "Image CDN"],
-        answer: 1,
-        explanation: "Downloaded sets are saved locally in the browser."
+        correctAnswerIndex: 1,
+        explanation: "Downloaded sets are saved locally in the browser.",
+        category: "General"
       },
       {
         id: "q2",
         question: "What can the admin upload?",
         options: ["Only images", "Quiz sets as JSON", "Videos only", "User passwords"],
-        answer: 1
+        correctAnswerIndex: 1,
+        category: "General"
       }
     ]
   }
@@ -54,7 +63,7 @@ export async function readSets(): Promise<QuizSet[]> {
       .find({}, { projection: { _id: 0 } })
       .sort({ createdAt: -1 })
       .toArray();
-    return sets.length ? sets : starterSets;
+    return sets.length ? (sets as QuizSet[]) : starterSets;
   }
 
   try {
@@ -143,19 +152,22 @@ function slug(value: string) {
     .slice(0, 52);
 }
 
+// 3. Updated Question Normalizer to prioritize "correctAnswerIndex"
 function normalizeQuestion(input: any, index: number): QuizQuestion {
   const options = input.options ?? input.choices;
   if (!input.question || !Array.isArray(options) || options.length < 2) {
     throw new Error(`Question ${index + 1} needs "question" and at least two "options".`);
   }
 
-  let answer = input.answer ?? input.correctAnswer ?? input.correct;
-  if (typeof answer === "string") {
-    const optionIndex = options.findIndex((option: string) => option === answer);
-    answer = optionIndex >= 0 ? optionIndex : Number(answer);
+  // Look for your preferred key first, then fallback safely
+  let correctAnswerIndex = input.correctAnswerIndex ?? input.answer ?? input.correctAnswer ?? input.correct;
+  
+  if (typeof correctAnswerIndex === "string") {
+    const optionIndex = options.findIndex((option: string) => option === correctAnswerIndex);
+    correctAnswerIndex = optionIndex >= 0 ? optionIndex : Number(correctAnswerIndex);
   }
 
-  if (!Number.isInteger(answer) || answer < 0 || answer >= options.length) {
+  if (!Number.isInteger(correctAnswerIndex) || correctAnswerIndex < 0 || correctAnswerIndex >= options.length) {
     throw new Error(`Question ${index + 1} has an invalid answer index.`);
   }
 
@@ -163,11 +175,13 @@ function normalizeQuestion(input: any, index: number): QuizQuestion {
     id: String(input.id ?? `q-${index + 1}-${Date.now()}`),
     question: String(input.question),
     options: options.map(String),
-    answer,
-    explanation: input.explanation ? String(input.explanation) : undefined
+    correctAnswerIndex,
+    explanation: input.explanation ? String(input.explanation) : undefined,
+    category: input.category ? String(input.category) : undefined
   };
 }
 
+// 4. Updated Set Normalizer to read top-level tags and totalQuestions counters
 export function normalizeSet(input: any): QuizSet {
   if (!input || !Array.isArray(input.questions) || input.questions.length === 0) {
     throw new Error('Each set needs a non-empty "questions" array.');
@@ -175,13 +189,16 @@ export function normalizeSet(input: any): QuizSet {
 
   const title = String(input.title ?? input.name ?? "Untitled Quiz Set");
   const createdAt = input.createdAt ? new Date(input.createdAt).toISOString() : new Date().toISOString();
+  const normalizedQuestions = input.questions.map(normalizeQuestion);
 
   return {
     id: String(input.id ?? `${slug(title) || "quiz-set"}-${Date.now()}`),
     title,
     description: input.description ? String(input.description) : undefined,
     category: input.category ? String(input.category) : undefined,
+    tags: Array.isArray(input.tags) ? input.tags.map(String) : undefined,
+    totalQuestions: Number(input.totalQuestions ?? normalizedQuestions.length),
     createdAt,
-    questions: input.questions.map(normalizeQuestion)
+    questions: normalizedQuestions
   };
 }
