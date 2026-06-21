@@ -232,6 +232,7 @@ export default function Home() {
       category: "Personal Revision",
       tags: ["Active Recall", "Spaced Repetition"],
       questions: randomizedSelection,
+      createdAt: new Date().toISOString() // Fixed property injection
     };
 
     setSets((prev) => {
@@ -470,7 +471,7 @@ export default function Home() {
                 <div className="adminActions"><button onClick={uploadJson}>Publish Set</button></div>
               </section>
               <aside className="adminList">
-                {adminSets.map((set) => <div className="attempt" key={set.id}><span>{set.title}</span><strong>{set.questions.length}</strong></div>)}
+                {adminSets.map((set) => <div className="attempt" key={set.id}><span>{set.title}</span>export default function Home() <strong>{set.questions.length}</strong></div>)}
                 <div className="pager">
                   <button disabled={adminPage <= 1} onClick={() => loadAdminSets(adminPage - 1)}>Prev</button>
                   <span>{adminPage}/{adminTotalPages}</span>
