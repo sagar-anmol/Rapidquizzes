@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { QuizSet, QuizQuestion, Answer, ViewMode } from "./types";
 
 type QuizEngineProps = {
@@ -48,238 +49,355 @@ export default function QuizEngine({
   backToTests,
 }: QuizEngineProps) {
   
-  if (viewMode === "test") {
-    return (
-      <section className="exam">
-        <div className="examBar">
-          <button className="ghost" onClick={backToTests}>All tests</button>
-          <div>
-            <p className="eyebrow">{selectedSet.category ?? "Online Test"}</p>
-            <h2>{selectedSet.title}</h2>
-          </div>
-          <div className="examStats">
-            <span>Mode Untimed</span>
-            <span>Answered {answeredCount}</span>
-            <span>Marked {markedCount}</span>
-          </div>
-        </div>
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const isReviewMode = viewMode === "review";
+  const isTestActive = !isReviewMode && !isSubmitted;
 
-        <div className="examBody">
-          <section className="questionDesk">
-            {!isSubmitted ? (
-              <>
-                <div className="questionHeader">
-                  <strong>Question No. {questionIndex + 1}</strong>
-                  <span>{questionIndex + 1} / {selectedSet.questions.length}</span>
-                </div>
-                <div className="progress">
-                  <span style={{ width: `${((questionIndex + 1) / selectedSet.questions.length) * 100}%` }} />
-                </div>
-                <h3>{currentQuestion.question}</h3>
-                <div className="options">
-                  {currentQuestion.options.map((option, index) => (
-                    <button
-                      className={answers[questionIndex] === index ? "chosen" : ""}
-                      key={`${currentQuestion.id}-${option}`}
-                      onClick={() => answerQuestion(index)}
-                    >
-                      <span>{String.fromCharCode(65 + index)}</span>
-                      {option}
-                    </button>
-                  ))}
-                </div>
-                <div className="examControls">
-                  <button className="ghost" disabled={questionIndex === 0} onClick={goPrevious}>Previous</button>
-                  <button className="clear" onClick={clearResponse}>Clear Response</button>
-                  <button className="mark" onClick={toggleMark}>
-                    {marked[questionIndex] ? "Unmark" : "Mark for Review"}
-                  </button>
-                  {questionIndex === selectedSet.questions.length - 1 ? (
-                    <button onClick={submitTest} style={{ backgroundColor: "#28a745", color: "#fff" }}>Submit Test</button>
-                  ) : (
-                    <button onClick={goNext}>Save & Next</button>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="scorecardInlinePanel" style={{ background: "#fff", padding: "40px 20px", textAlign: "center", borderRadius: "8px", border: "1px solid #eaeaea" }}>
-                <div style={{ width: "80px", height: "80px", background: "#e6f4ea", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
-                  <span style={{ fontSize: "2rem" }}>🏆</span>
-                </div>
-                <p className="eyebrow" style={{ color: "#28a745", fontWeight: "bold", fontSize: "1.1rem" }}>Assessment Submitted Successfully</p>
-                <h2 style={{ fontSize: "3.5rem", margin: "15px 0", color: "#111" }}>
-                  {score} <span style={{ fontSize: "1.5rem", color: "#888" }}>/ {selectedSet.questions.length}</span>
-                </h2>
-                <p className="muted" style={{ marginBottom: "30px" }}>You scored {Math.round((score / selectedSet.questions.length) * 100)}% on this assessment profile module.</p>
-                <div className="scorecardActions" style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "320px", margin: "0 auto" }}>
-                  <button style={{ width: "100%", padding: "14px", fontSize: "1rem", fontWeight: "600" }} onClick={startDetailedReview}>
-                    View Result Breakdown ➔
-                  </button>
-                  <button className="clear" style={{ width: "100%" }} onClick={retry}>Retry Test</button>
-                  <button className="ghost" style={{ width: "100%" }} onClick={backToTests}>Back to Home Dashboard</button>
-                </div>
-              </div>
-            )}
-          </section>
+  // Intercept Browser Tab Closures / Refreshes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isTestActive) return;
+      const message = "Are you sure you want to exit? Your active quiz progress will be permanently lost.";
+      e.preventDefault();
+      e.returnValue = message;
+      return message;
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isTestActive]);
 
-          <aside className="palette">
-            <h2>Question Palette</h2>
-            <div className="legend">
-              <span><b className="answered" /> Answered</span>
-              <span><b className="notAnswered" /> Not answered</span>
-              <span><b className="review" /> Review</span>
+  // Safe Exit Confirmation Handler
+  const handleSafeExitConfirmation = () => {
+    if (isTestActive) {
+      const confirmLeave = window.confirm(
+        "⚠️ Warning: Leaving this page will erase your active answers. Your quiz progress will be completely lost!\n\nDo you want to proceed and exit?"
+      );
+      if (!confirmLeave) return;
+    }
+    backToTests();
+  };
+
+  return (
+    <section className="examContainer" style={{ width: "100%", maxWidth: "1280px", margin: "0 auto", position: "relative" }}>
+      
+      {/* Mobile Topbar Header */}
+      <div className="mobileExamHeader" style={{
+        display: "none", 
+        background: "#ffffff", 
+        padding: "8px 12px", 
+        borderBottom: "1px solid #e4e4e7",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }}>
+        <button className="ghost" onClick={handleSafeExitConfirmation} style={{ padding: "4px 8px", fontSize: "0.85rem", border: "1px solid #e4e4e7", borderRadius: "6px" }}>◀ Exit</button>
+        <span style={{ fontWeight: "700", fontSize: "0.85rem", color: "#27272a" }}>Q. {questionIndex + 1}/{selectedSet.questions.length}</span>
+        
+        <button 
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
+          style={{ 
+            background: "#2563eb", 
+            border: "none", 
+            color: "#ffffff", 
+            padding: "6px 12px", 
+            borderRadius: "6px", 
+            cursor: "pointer", 
+            fontSize: "0.85rem", 
+            fontWeight: "600",
+            boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
+          }}
+        >
+          ☰ Palette
+        </button>
+      </div>
+
+      {/* Main Layout Grid Flexbox container */}
+      <div className="examBody" style={{ display: "flex", width: "100%", gap: "24px" }}>
+        
+        {/* Core Workspace Section Desk */}
+        <section className="questionDesk" style={{ flex: 1, padding: "16px", background: "#ffffff", borderRadius: "12px", border: "1px solid #e4e4e7", height: "fit-content" }}>
+          
+          {/* Desktop Header Dashboard */}
+          <div className="examBar desktopOnlyBar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: isReviewMode ? "2px solid #16a34a" : "1px solid #e4e4e7", paddingBottom: "12px", marginBottom: "16px" }}>
+            <button className="ghost" onClick={handleSafeExitConfirmation} style={{ padding: "6px 12px", border: "1px solid #e4e4e7", borderRadius: "6px" }}>◀ Leave Test</button>
+            <div style={{ textAlign: "center" }}>
+              <p className="eyebrow" style={{ color: isReviewMode ? "#16a34a" : "#2563eb", fontWeight: "bold", fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.05em", margin: 0 }}>
+                {isReviewMode ? "Detailed Review Profile" : selectedSet.category ?? "Online Test"}
+              </p>
+              <h2 style={{ fontSize: "1.35rem", fontWeight: "700", color: "#18181b", margin: "2px 0" }}>{selectedSet.title}</h2>
             </div>
-            <div className="paletteGrid">
-              {selectedSet.questions.map((question, index) => {
-                const state = marked[index] ? "review" : typeof answers[index] === "number" ? "answered" : "notAnswered";
+            <div className="examStats" style={{ fontSize: "0.85rem", display: "flex", gap: "12px", fontWeight: "500" }}>
+              {isReviewMode ? (
+                <span style={{ background: "#16a34a", color: "#fff", padding: "4px 10px", borderRadius: "8px", fontWeight: "bold" }}>
+                  Score: {score}/{selectedSet.questions.length}
+                </span>
+              ) : (
+                <>
+                  <span style={{ background: "#f4f4f5", padding: "4px 8px", borderRadius: "6px" }}>Answered: <b>{answeredCount}</b></span>
+                  <span style={{ background: "#fef3c7", color: "#d97706", padding: "4px 8px", borderRadius: "6px" }}>Marked: <b>{markedCount}</b></span>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="questionHeader" style={{ fontSize: "0.95rem", fontWeight: "700", color: "#3f3f46" }}>
+            {isReviewMode ? "Review " : ""}Question {questionIndex + 1} of {selectedSet.questions.length}
+          </div>
+          
+          <div className="progress" style={{ margin: "8px 0 16px", background: "#e4e4e7", height: "5px", borderRadius: "3px", overflow: "hidden" }}>
+            <span style={{ display: "block", height: "100%", width: `${((questionIndex + 1) / selectedSet.questions.length) * 100}%`, backgroundColor: isReviewMode ? "#16a34a" : "#2563eb", transition: "width 0.2s ease" }} />
+          </div>
+
+          <h3 style={{ margin: "16px 0", lineHeight: "1.4", fontSize: "1.15rem", fontWeight: "600", color: "#18181b" }}>
+            {currentQuestion.question}
+          </h3>
+
+          <div className="options" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            {currentQuestion.options.map((option, index) => {
+              if (!isReviewMode) {
                 return (
                   <button
-                    className={`paletteButton ${state} ${index === questionIndex ? "current" : ""}`}
-                    key={question.id}
-                    onClick={() => !isSubmitted && setQuestionIndex(index)}
+                    className={answers[questionIndex] === index ? "chosen" : ""}
+                    key={`${currentQuestion.id}-${option}`}
+                    onClick={() => answerQuestion(index)}
                     disabled={isSubmitted}
+                    style={{ 
+                      padding: "12px 14px", 
+                      fontSize: "0.95rem", 
+                      textAlign: "left", 
+                      display: "flex", 
+                      alignItems: "center", 
+                      gap: "12px",
+                      borderRadius: "8px",
+                      cursor: "pointer"
+                    }}
+                  >
+                    <span className="opt-letter" style={{
+                      fontWeight: "bold",
+                      background: answers[questionIndex] === index ? "#2563eb" : "#f4f4f5",
+                      color: answers[questionIndex] === index ? "#fff" : "#18181b",
+                      width: "24px", height: "24px", borderRadius: "50%",
+                      display: "flex", alignItems: "center", justifyContent: "center"
+                    }}>{String.fromCharCode(65 + index)}</span>
+                    {option}
+                  </button>
+                );
+              } else {
+                const isUserSelection = answers[questionIndex] === index;
+                const isCorrectTarget = index === currentQuestion.correctAnswerIndex;
+                let targetBg = "#ffffff";
+                let targetBorder = "1px solid #e4e4e7";
+
+                if (isCorrectTarget) {
+                  targetBg = "#f0fdf4";
+                  targetBorder = "1px solid #16a34a";
+                } else if (isUserSelection) {
+                  targetBg = "#fef2f2";
+                  targetBorder = "1px solid #dc2626";
+                }
+
+                return (
+                  <div 
+                    key={`${currentQuestion.id}-review-${index}`}
+                    style={{
+                      background: targetBg,
+                      border: targetBorder,
+                      padding: "12px 14px",
+                      borderRadius: "8px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      fontSize: "0.95rem"
+                    }}
+                  >
+                    <span style={{
+                      background: isCorrectTarget ? "#16a34a" : isUserSelection ? "#dc2626" : "#e4e4e7",
+                      color: isCorrectTarget || isUserSelection ? "#fff" : "#27272a",
+                      width: "24px", height: "24px", borderRadius: "50%",
+                      display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "0.85rem"
+                    }}>
+                      {String.fromCharCode(65 + index)}
+                    </span>
+                    <span>{option}</span>
+                  </div>
+                );
+              }
+            })}
+          </div>
+
+          {isReviewMode && currentQuestion.explanation && (
+            <div style={{ background: "#f4f4f5", borderLeft: "4px solid #16a34a", padding: "12px 14px", marginTop: "16px", borderRadius: "6px", fontSize: "0.9rem" }}>
+              <strong style={{ color: "#16a34a" }}>Explanation:</strong>
+              <p style={{ marginTop: "4px", lineHeight: "1.5", color: "#52525b", margin: 0 }}>{currentQuestion.explanation}</p>
+            </div>
+          )}
+
+          {!isReviewMode && isSubmitted && (
+            <div className="scorecardInlinePanel" style={{ background: "#ffffff", padding: "24px 16px", textAlign: "center", borderRadius: "10px", border: "1px solid #e4e4e7", marginTop: "20px" }}>
+              <p style={{ color: "#16a34a", fontWeight: "bold", fontSize: "0.9rem", textTransform: "uppercase", margin: 0 }}>Test Completed Successfully</p>
+              <h2 style={{ fontSize: "2.25rem", margin: "8px 0", color: "#18181b" }}>{score} <span style={{ fontSize: "1.25rem", color: "#71717a" }}>/ {selectedSet.questions.length}</span></h2>
+              <div style={{ display: "flex", gap: "10px", justifyContent: "center", marginTop: "12px" }}>
+                <button style={{ padding: "10px 20px", fontSize: "0.9rem", fontWeight: "600" }} onClick={startDetailedReview}>Breakdown Profile ➔</button>
+                <button className="clear" style={{ padding: "10px 20px", fontSize: "0.9rem" }} onClick={retry}>Retry</button>
+              </div>
+            </div>
+          )}
+
+          {/* Core Navigation Controls Bar Container */}
+          <div className="responsiveControlsRow" style={{ marginTop: "24px", display: "flex", width: "100%", gap: "8px", alignItems: "center" }}>
+            <button className="ghost" disabled={questionIndex === 0} onClick={goPrevious} style={{ padding: "10px 18px", fontSize: "0.9rem", fontWeight: "600", minWidth: "75px" }}>Prev</button>
+            
+            {!isReviewMode && !isSubmitted && (
+              <>
+                <button className="clear" onClick={clearResponse} style={{ padding: "10px 14px", fontSize: "0.9rem" }}>Clear</button>
+                <button className="mark" onClick={toggleMark} style={{ padding: "10px 16px", fontSize: "0.9rem", whiteSpace: "nowrap" }}>
+                  {marked[questionIndex] ? "Unmark" : "Mark as Review"}
+                </button>
+              </>
+            )}
+
+            {isReviewMode && <button onClick={retry} className="clear" style={{ padding: "10px 14px", fontSize: "0.9rem", fontWeight: "600" }}>Reset & Retry</button>}
+
+            {questionIndex === selectedSet.questions.length - 1 ? (
+              !isSubmitted && !isReviewMode ? (
+                <button onClick={submitTest} style={{ backgroundColor: "#16a34a", color: "#fff", padding: "10px 20px", fontSize: "0.9rem", fontWeight: "700", marginLeft: "auto" }}>Submit Test</button>
+              ) : isReviewMode ? (
+                <button onClick={backToTests} style={{ padding: "10px 20px", fontSize: "0.9rem", fontWeight: "600", marginLeft: "auto" }}>Finish</button>
+              ) : null
+            ) : (
+              <button onClick={goNext} style={{ padding: "10px 20px", fontSize: "0.9rem", fontWeight: "600", whiteSpace: "nowrap", marginLeft: "auto" }}>Save & Next</button>
+            )}
+          </div>
+        </section>
+
+        {/* Drawer Dim Overlay */}
+        {mobileMenuOpen && (
+          <div className="mobileMenuOverlay" onClick={() => setMobileMenuOpen(false)} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.3)", zIndex: 998 }} />
+        )}
+
+        {/* Right Side Sidebar Panel (Perfect Desktop Column + Collapsible Mobile Drawer) */}
+        <aside className={`palette ${mobileMenuOpen ? "mobileOpen" : ""}`} style={{ 
+          display: "flex", 
+          flexDirection: "column", 
+          width: "300px", 
+          background: "#ffffff", 
+          padding: "16px", 
+          borderRadius: "12px", 
+          border: "1px solid #e4e4e7",
+          height: "fit-content"
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+            <h2 style={{ fontSize: "1.1rem", fontWeight: "700", color: "#18181b", margin: 0 }}>{isReviewMode ? "Review Center" : "Question Palette"}</h2>
+            <button className="mobileCloseButton" onClick={() => setMobileMenuOpen(false)} style={{ display: "none", background: "none", border: "none", fontSize: "1.2rem", color: "#71717a", cursor: "pointer" }}>✕</button>
+          </div>
+
+          <div style={{ flex: 1, overflowY: "auto", maxH: "380px" }}>
+            <div className="paletteGrid" style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "8px" }}>
+              {selectedSet.questions.map((question, index) => {
+                let btnClass = "paletteButton";
+                let inlineStyles: React.CSSProperties = {};
+
+                if (isReviewMode) {
+                  inlineStyles = { backgroundColor: answers[index] === question.correctAnswerIndex ? "#16a34a" : "#dc2626", color: "#fff" };
+                } else {
+                  btnClass += ` ${marked[index] ? "review" : typeof answers[index] === "number" ? "answered" : "notAnswered"}`;
+                }
+
+                return (
+                  <button
+                    className={`${btnClass} ${index === questionIndex ? "current" : ""}`}
+                    key={question.id}
+                    style={{
+                      ...inlineStyles,
+                      padding: "10px 0",
+                      fontSize: "0.9rem",
+                      fontWeight: "600",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      textAlign: "center"
+                    }}
+                    onClick={() => { setQuestionIndex(index); setMobileMenuOpen(false); }}
+                    disabled={isSubmitted && !isReviewMode}
                   >
                     {index + 1}
                   </button>
                 );
               })}
             </div>
-            <div className="summaryBox">
-              <span>Total: {selectedSet.questions.length}</span>
-              <span>Answered: {answeredCount}</span>
+          </div>
+
+          <div style={{ borderTop: "1px solid #e4e4e7", paddingTop: "14px", marginTop: "14px" }}>
+            <div className="summaryBox" style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "#52525b", fontWeight: "500", padding: "4px" }}>
+              <span>Total Questions: <b>{selectedSet.questions.length}</b></span>
+              <span>{isReviewMode ? `Correct: ${score}` : `Selected: ${answeredCount}`}</span>
             </div>
-            {!isSubmitted && <button onClick={submitTest} style={{ width: "100%", marginTop: "20px" }}>Submit Test</button>}
-          </aside>
-        </div>
-      </section>
-    );
-  }
 
-  // viewMode === "review" Layout
-  return (
-    <section className="exam reviewSectionLayout">
-      <div className="examBar" style={{ borderBottom: "2px solid #28a745" }}>
-        <button className="ghost" onClick={backToTests}>Dashboard</button>
-        <div>
-          <p className="eyebrow" style={{ color: "#28a745", fontWeight: "bold" }}>Detailed Review Profile</p>
-          <h2>{selectedSet.title}</h2>
-        </div>
-        <div className="examStats">
-          <span style={{ background: "#28a745", color: "#fff", padding: "4px 10px", borderRadius: "12px", fontWeight: "bold" }}>
-            Score: {score}/{selectedSet.questions.length}
-          </span>
-        </div>
-      </div>
-
-      <div className="examBody">
-        <section className="questionDesk">
-          <div className="questionHeader">
-            <strong>Review Question {questionIndex + 1}</strong>
-            <span>{questionIndex + 1} / {selectedSet.questions.length}</span>
-          </div>
-          <div className="progress">
-            <span style={{ width: `${((questionIndex + 1) / selectedSet.questions.length) * 100}%`, backgroundColor: "#28a745" }} />
-          </div>
-          <h3 style={{ margin: "25px 0" }}>{currentQuestion.question}</h3>
-          
-          <div className="options">
-            {currentQuestion.options.map((option, index) => {
-              const isUserSelection = answers[questionIndex] === index;
-              const isCorrectTarget = index === currentQuestion.correctAnswerIndex;
-              let targetColor = "#fff";
-              let borderSettings = "1px solid #eaeaea";
-              let badgeLabel = "";
-
-              if (isCorrectTarget) {
-                targetColor = "#d4edda";
-                borderSettings = "2px solid #28a745";
-                badgeLabel = " ✔ Correct Option Target";
-              } else if (isUserSelection) {
-                targetColor = "#f8d7da";
-                borderSettings = "2px solid #dc3545";
-                badgeLabel = " ✘ Your Selection";
-              }
-
-              return (
-                <div 
-                  key={`${currentQuestion.id}-review-${index}`}
-                  style={{
-                    background: targetColor,
-                    border: borderSettings,
-                    padding: "16px",
-                    borderRadius: "6px",
-                    marginBottom: "12px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    fontWeight: isCorrectTarget || isUserSelection ? "600" : "normal"
-                  }}
-                >
-                  <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
-                    <span style={{
-                      background: isCorrectTarget ? "#28a745" : isUserSelection ? "#dc3545" : "#eaeaea",
-                      color: isCorrectTarget || isUserSelection ? "#fff" : "#333",
-                      width: "28px",
-                      height: "28px",
-                      borderRadius: "50%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "0.9rem",
-                      fontWeight: "bold"
-                    }}>
-                      {String.fromCharCode(65 + index)}
-                    </span>
-                    <span>{option}</span>
-                  </div>
-                  {badgeLabel && <span style={{ fontSize: "0.8rem", textTransform: "uppercase", opacity: 0.8 }}>{badgeLabel}</span>}
-                </div>
-              );
-            })}
-          </div>
-
-          {currentQuestion.explanation && (
-            <div style={{ background: "#f8f9fa", borderLeft: "4px solid #28a745", padding: "16px", marginTop: "25px", borderRadius: "4px" }}>
-              <strong style={{ color: "#111" }}>Explanation Insight:</strong>
-              <p style={{ marginTop: "6px", fontSize: "0.95rem", lineHeight: "1.6", opacity: 0.9 }}>{currentQuestion.explanation}</p>
-            </div>
-          )}
-
-          <div className="examControls" style={{ marginTop: "30px" }}>
-            <button className="ghost" disabled={questionIndex === 0} onClick={goPrevious}>Previous</button>
-            <button onClick={retry} className="clear">Reset & Try Again</button>
-            {questionIndex === selectedSet.questions.length - 1 ? (
-              <button onClick={backToTests}>Finish Review</button>
-            ) : (
-              <button onClick={goNext}>Next Question ➔</button>
+            {!isSubmitted && !isReviewMode && (
+              <button 
+                onClick={() => { submitTest(); setMobileMenuOpen(false); }} 
+                style={{ width: "100%", padding: "12px", marginTop: "12px", backgroundColor: "#16a34a", color: "#ffffff", fontWeight: "700", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "0.95rem", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}
+              >
+                Submit Test
+              </button>
             )}
           </div>
-        </section>
-
-        <aside className="palette">
-          <h2>Review Board</h2>
-          <div className="legend">
-            <span><b style={{ backgroundColor: "#28a745", display: "inline-block", width: "12px", height: "12px", borderRadius: "50%" }} /> Correct</span>
-            <span><b style={{ backgroundColor: "#dc3545", display: "inline-block", width: "12px", height: "12px", borderRadius: "50%" }} /> Incorrect</span>
-          </div>
-          <div className="paletteGrid">
-            {selectedSet.questions.map((question, index) => {
-              const gradedCorrect = answers[index] === question.correctAnswerIndex;
-              return (
-                <button
-                  className={`paletteButton ${index === questionIndex ? "current" : ""}`}
-                  key={`palette-review-${question.id}`}
-                  onClick={() => setQuestionIndex(index)}
-                  style={{ backgroundColor: gradedCorrect ? "#28a745" : "#dc3545", color: "#fff" }}
-                >
-                  {index + 1}
-                </button>
-              );
-            })}
-          </div>
-          <button className="ghost" onClick={backToTests} style={{ width: "100%", marginTop: "30px" }}>Exit to Dashboard</button>
         </aside>
       </div>
+
+      {/* Standard Script String Loader Injecting Raw Cross-Platform Platform CSS */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media (max-width: 768px) {
+          header.topbar {
+            display: none !important;
+          }
+          .mobileExamHeader {
+            display: flex !important;
+          }
+          .desktopOnlyBar {
+            display: none !important;
+          }
+          .examBody {
+            flex-direction: column;
+            gap: 0 !important;
+          }
+          .questionDesk {
+            border: none !important;
+            border-radius: 0 !important;
+            padding: 12px 14px !important;
+          }
+          .responsiveControlsRow {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+          }
+          .responsiveControlsRow button {
+            text-align: center !important;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            padding: 10px 4px !important;
+            font-size: 0.8rem !important;
+          }
+          aside.palette {
+            position: fixed !important;
+            top: 0; right: 0; bottom: 0;
+            width: 250px !important;
+            background: #ffffff !important;
+            z-index: 999 !important;
+            box-shadow: -4px 0 15px rgba(0,0,0,0.08);
+            padding: 14px !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+            border: none !important;
+            transform: translateX(100%);
+            transition: transform 0.2s ease-in-out;
+          }
+          aside.palette.mobileOpen {
+            transform: translateX(0) !important;
+          }
+          .mobileCloseButton {
+            display: block !important;
+          }
+        }
+      `}} />
     </section>
   );
 }

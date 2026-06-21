@@ -16,7 +16,9 @@ function isAdmin(request: Request) {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
-  const limit = Math.min(50, Math.max(1, Number(searchParams.get("limit") ?? "12")));
+  
+  // FIXED: Hardcoded to exactly 5. No matter what parameter the client sends, it stays 5.
+  const limit = 5;
 
   const { sets, total } = await listSets(page, limit);
 

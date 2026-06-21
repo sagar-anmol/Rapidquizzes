@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { QuizSet, Attempt, Answer, ViewMode, AppMode } from "@/components/types";
 import CandidateDashboard from "@/components/CandidateDashboard";
 import QuizEngine from "@/components/QuizEngine";
@@ -28,8 +28,8 @@ const tokenKey = "quiz.adminToken";
 
 export default function Home() {
   const [sets, setSets] = useState<QuizSet[]>([]);
-  const [selectedSetId, setSelectedSetId] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("select");
+  const [selectedSetId, setSelectedSetId] = useState("");
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [marked, setMarked] = useState<boolean[]>([]);
@@ -46,6 +46,17 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
 
+  // Infinite Scroll State Controls
+  const [scrollPage, setScrollPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const infiniteAnchorRef = useRef<HTMLDivElement>(null);
+
+  // Directional Floating Action Button State Metrics
+  const [showScrollFAB, setShowScrollFAB] = useState(false);
+  const [scrollDirection, setScrollDirection] = useState<"up" | "down">("down");
+  const lastScrollY = useRef(0);
+
   const selectedSet = useMemo(() => sets.find((set) => set.id === selectedSetId), [sets, selectedSetId]);
   const currentQuestion = selectedSet?.questions[questionIndex];
   
@@ -61,7 +72,7 @@ export default function Home() {
     const savedAttempts = JSON.parse(localStorage.getItem(attemptKey) ?? "[]");
     setAdminToken(savedToken);
     setAttempts(Array.isArray(savedAttempts) ? savedAttempts : []);
-    loadSets();
+    loadInitialSets();
   }, []);
 
   useEffect(() => {
@@ -70,6 +81,58 @@ export default function Home() {
     savedProgress[selectedSet.id] = { questionIndex, answers, marked };
     localStorage.setItem(progressKey, JSON.stringify(savedProgress));
   }, [answers, marked, questionIndex, selectedSet, viewMode, isSubmitted]);
+
+  // Infinite Scroll Observer Setup
+  useEffect(() => {
+    if (!hasMore || viewMode !== "select" || appMode !== "candidate" || loadingMore) return;
+
+    const observer = new IntersectionObserver(
+      async (entries) => {
+        if (entries[0].isIntersecting) {
+          await loadNextBatch();
+        }
+      },
+      { threshold: 0.1, rootMargin: "100px" }
+    );
+
+    const currentAnchor = infiniteAnchorRef.current;
+    if (currentAnchor) observer.observe(currentAnchor);
+
+    return () => {
+      if (currentAnchor) observer.unobserve(currentAnchor);
+    };
+  }, [scrollPage, hasMore, viewMode, appMode, loadingMore]);
+
+  // Handle Scroll Watcher for Floating Navigation Icon Directionality Rules
+  useEffect(() => {
+    if (viewMode !== "select" || appMode !== "candidate") {
+      setShowScrollFAB(false);
+      return;
+    }
+
+    const handleScrollWatcher = () => {
+      const currentScrollY = window.scrollY;
+      
+      // Only display the floating controller if the user has scrolled down past 300px mid-way
+      if (currentScrollY > 300) {
+        setShowScrollFAB(true);
+      } else {
+        setShowScrollFAB(false);
+      }
+
+      // Check current structural vector delta path direction loops
+      if (currentScrollY > lastScrollY.current) {
+        setScrollDirection("down");
+      } else {
+        setScrollDirection("up");
+      }
+      
+      lastScrollY.current = currentScrollY;
+    };
+
+    window.addEventListener("scroll", handleScrollWatcher, { passive: true });
+    return () => window.removeEventListener("scroll", handleScrollWatcher);
+  }, [viewMode, appMode]);
 
   function normalizeSavedAnswers(value: unknown, total: number): Answer[] {
     const incoming = Array.isArray(value) ? value : [];
@@ -81,19 +144,72 @@ export default function Home() {
     return Array.from({ length: total }, (_, idx) => Boolean(incoming[idx]));
   }
 
-  async function loadSets() {
+  async function loadInitialSets() {
     try {
-      const response = await fetch("/api/sets?limit=50", { cache: "no-store" });
+      const response = await fetch("/api/sets?page=1", { cache: "no-store" });
       if (!response.ok) throw new Error("Fetch failed");
       const data = await response.json();
-      setSets(data.sets);
-      localStorage.setItem(setKey, JSON.stringify(data.sets));
+      
+      setSets(data.sets ?? []);
+      localStorage.setItem(setKey, JSON.stringify(data.sets ?? []));
       setStatus("Online sets loaded");
+      setScrollPage(1);
+      
+      if ((data.sets ?? []).length >= data.total) {
+        setHasMore(false);
+      }
     } catch {
       const cached = JSON.parse(localStorage.getItem(setKey) ?? "[]");
       setSets(Array.isArray(cached) ? cached : []);
+      setHasMore(false);
       setStatus(cached.length ? "Using downloaded offline sets" : "No sets available yet");
     }
+  }
+
+  async function loadNextBatch() {
+    setLoadingMore(true);
+    const nextPage = scrollPage + 1;
+    
+    try {
+      const response = await fetch(`/api/sets?page=${nextPage}`, { cache: "no-store" });
+      if (!response.ok) throw new Error("Fetch failed");
+      const data = await response.json();
+      
+      if (data.sets && data.sets.length > 0) {
+        setSets((prev) => {
+          const updated = [...prev, ...data.sets];
+          localStorage.setItem(setKey, JSON.stringify(updated));
+          return updated;
+        });
+        setScrollPage(nextPage);
+        
+        if (sets.length + data.sets.length >= data.total) {
+          setHasMore(false);
+        }
+      } else {
+        setHasMore(false);
+      }
+    } catch (e) {
+      console.error(e);
+      setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  // Floating Action Click Event Handler Axis Snaps
+  const handleFloatingScrollAction = () => {
+    if (scrollDirection === "down") {
+      // Snap smooth viewport down into infinite loading node anchor lines
+      infiniteAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    } else {
+      // Snap smooth viewport target back to apex structural header bounds
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  async function loadSets() {
+    await loadInitialSets();
   }
 
   async function loadAdminSets(page = adminPage) {
@@ -168,8 +284,9 @@ export default function Home() {
       setMessage(data.error ?? "Login failed");
       return;
     }
-    setAdminToken(data.token);
-    localStorage.setItem(tokenKey, data.token);
+    const token = data.token;
+    setAdminToken(token);
+    localStorage.setItem(tokenKey, token);
     setMessage("Admin panel unlocked");
     loadAdminSets(1);
   }
@@ -192,12 +309,12 @@ export default function Home() {
       return;
     }
     setMessage(`Saved ${data.saved} set${data.saved === 1 ? "" : "s"}.`);
-    await loadSets();
+    await loadInitialSets();
     await loadAdminSets(1);
   }
 
   return (
-    <main>
+    <main style={{ position: "relative", minHeight: "100vh" }}>
       <header className="topbar">
         <div>
           <p className="eyebrow">{appMode === "admin" ? "Administrative Console" : "Assessment Console"}</p>
@@ -213,7 +330,14 @@ export default function Home() {
       {appMode === "candidate" && (
         <section className="shell">
           {viewMode === "select" ? (
-            <CandidateDashboard sets={sets} attempts={attempts} status={status} downloadOffline={() => localStorage.setItem(setKey, JSON.stringify(sets))} startTest={startTest} />
+            <>
+              <CandidateDashboard sets={sets} attempts={attempts} status={status} downloadOffline={() => localStorage.setItem(setKey, JSON.stringify(sets))} startTest={startTest} />
+              
+              {/* Invisible infinite loader tracking marker anchor row */}
+              <div ref={infiniteAnchorRef} style={{ width: "100%", padding: "24px 12px", textAlign: "center", color: "#6b7280", fontSize: "0.9rem", fontWeight: "500" }}>
+                {hasMore ? (loadingMore ? "🔄 Loading next quiz sets..." : "↓ Scroll down to view older tests") : "🎉 Caught up! All available quiz sets loaded."}
+              </div>
+            </>
           ) : (
             selectedSet && currentQuestion && (
               <QuizEngine selectedSet={selectedSet} currentQuestion={currentQuestion} questionIndex={questionIndex} setQuestionIndex={setQuestionIndex} viewMode={viewMode} answers={answers} marked={marked} score={score} answeredCount={answeredCount} markedCount={markedCount} isSubmitted={isSubmitted} answerQuestion={answerQuestion} clearResponse={clearResponse} toggleMark={toggleMark} goPrevious={() => setQuestionIndex(Math.max(questionIndex - 1, 0))} goNext={() => setQuestionIndex(Math.min(questionIndex + 1, selectedSet.questions.length - 1))} submitTest={submitTest} startDetailedReview={() => { setQuestionIndex(0); setViewMode("review"); }} retry={() => { setAnswers(Array.from({ length: selectedSet.questions.length }, () => null)); setMarked(Array.from({ length: selectedSet.questions.length }, () => false)); setQuestionIndex(0); setIsSubmitted(false); setViewMode("test"); }} backToTests={() => { setSelectedSetId(""); setQuestionIndex(0); setAnswers([]); setMarked([]); setIsSubmitted(false); setViewMode("select"); }} />
@@ -234,14 +358,14 @@ export default function Home() {
 
           {!adminToken ? (
             <form className="loginCard" onSubmit={loginAdmin}>
-              <label>Admin ID <input value={adminId} onChange={(e) => setAdminId(event?.target ? (e.target as HTMLInputElement).value : "")} /></label>
-              <label>Password <input type="password" value={adminPassword} onChange={(e) => setAdminPassword(event?.target ? (e.target as HTMLInputElement).value : "")} /></label>
+              <label>Admin ID <input value={adminId} onChange={(e) => setAdminId(e.target.value)} /></label>
+              <label>Password <input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} /></label>
               <button type="submit">Login</button>
             </form>
           ) : (
             <div className="adminGrid">
               <section className="adminEditor">
-                <textarea value={jsonInput} onChange={(e) => setJsonInput(event?.target ? (e.target as HTMLTextAreaElement).value : "")} />
+                <textarea value={jsonInput} onChange={(e) => setJsonInput(e.target.value)} />
                 <div className="adminActions"><button onClick={uploadJson}>Publish Set</button></div>
               </section>
               <aside className="adminList">
@@ -256,6 +380,37 @@ export default function Home() {
           )}
           {message && <p className="message">{message}</p>}
         </section>
+      )}
+
+      {/* Dynamic Circular Directional Floating Action Button */}
+      {showScrollFAB && (
+        <button
+          onClick={handleFloatingScrollAction}
+          style={{
+            position: "fixed",
+            bottom: "24px",
+            right: "24px",
+            width: "48px",
+            height: "48px",
+            borderRadius: "50%",
+            backgroundColor: "#2563eb",
+            color: "#ffffff",
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)",
+            fontSize: "1.25rem",
+            fontWeight: "bold",
+            zIndex: 100,
+            transition: "transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.15s ease",
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#1d4ed8"}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#2563eb"}
+        >
+          {scrollDirection === "down" ? "↓" : "↑"}
+        </button>
       )}
     </main>
   );
