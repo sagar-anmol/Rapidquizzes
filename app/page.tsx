@@ -273,6 +273,7 @@ export default function Home() {
     setViewMode("test");
   }
 
+  // Option responses mutation gate
   function answerQuestion(optionIndex: number) {
     if (!selectedSet || isSubmitted) return;
     const nextAnswers = [...answers];
@@ -387,7 +388,7 @@ export default function Home() {
       <header className="topbar">
         <div>
           <p className="eyebrow">{appMode === "admin" ? "Administrative Console" : "Assessment Console"}</p>
-          <h1>{appMode === "admin" ? "Question Set Management" : "Current Affairs Online Test"}</h1>
+          <h1>{appMode === "admin" ? "Management" : "Current Affairs & Online Tests"}</h1>
         </div>
         <div className="topActions">
           <button className="ghost" onClick={() => { setAppMode(appMode === "admin" ? "candidate" : "admin"); setMessage(""); if(appMode !== "admin" && adminToken) loadAdminSets(1); }}>
@@ -451,8 +452,35 @@ export default function Home() {
 
               <CandidateDashboard sets={sets} attempts={attempts} status={status} downloadOffline={() => localStorage.setItem(setKey, JSON.stringify(sets))} startTest={startTest} />
               
-              <div ref={infiniteAnchorRef} style={{ width: "100%", padding: "24px 12px", textAlign: "center", color: "#6b7280", fontSize: "0.9rem", fontWeight: "500" }}>
-                {hasMore ? (loadingMore ? "🔄 Loading next quiz sets..." : "↓ Scroll down to view older tests") : "🎉 Caught up! All available quiz sets loaded."}
+              {/* Dynamic Animated Infinite Scroll Loader Row */}
+              <div 
+                ref={infiniteAnchorRef} 
+                className={loadingMore ? "infiniteLoaderActivePulse" : ""}
+                style={{ 
+                  width: "100%", 
+                  padding: "28px 12px", 
+                  textAlign: "center", 
+                  color: "#6b7280", 
+                  fontSize: "0.92rem", 
+                  fontWeight: "600",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "10px"
+                }}
+              >
+                {hasMore ? (
+                  loadingMore ? (
+                    <>
+                      <span className="apiLoaderSpinnerIcon" style={{ display: "inline-block", fontSize: "1.2rem" }}>🔄</span> 
+                      <span>Fetching next quiz sets...</span>
+                    </>
+                  ) : (
+                    "↓ Scroll down to view older tests"
+                  )
+                ) : (
+                  "🎉 Caught up! All available quiz sets loaded."
+                )}
               </div>
             </>
           ) : (
@@ -530,7 +558,7 @@ export default function Home() {
         </button>
       )}
 
-      {/* Embedded Global Styles injecting CSS keyframes for highlighting animations */}
+      {/* Embedded Global Styles injecting CSS keyframes for animations */}
       <style dangerouslySetInnerHTML={{ __html: `
         .highlightRecallGlow {
           border: 2px solid #e4e4e7;
@@ -539,6 +567,28 @@ export default function Home() {
 
         html.dark .highlightRecallGlow p {
           color: #a1a1aa !important;
+        }
+
+        /* 360 Degree Spinning Keyframes for Spinner */
+        .apiLoaderSpinnerIcon {
+          animation: nativeSyncSpinRotation 1.2s infinite linear;
+        }
+
+        /* Background Pulsing Loading Tracker State */
+        .infiniteLoaderActivePulse {
+          animation: inlineFetchPulseBackground 1.5s infinite ease-in-out;
+          color: #2563eb !important;
+        }
+
+        @keyframes nativeSyncSpinRotation {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        @keyframes inlineFetchPulseBackground {
+          0% { opacity: 0.6; }
+          50% { opacity: 1; transform: scale(1.01); }
+          100% { opacity: 0.6; }
         }
 
         @keyframes animatedRecallBorderGlow {
