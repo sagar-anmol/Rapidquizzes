@@ -57,6 +57,9 @@ export default function Home() {
   const [scrollDirection, setScrollDirection] = useState<"up" | "down">("down");
   const lastScrollY = useRef(0);
 
+  // Smart Recall State Counters
+  const [weakPoolCount, setWeakPoolCount] = useState(0);
+
   const selectedSet = useMemo(() => sets.find((set) => set.id === selectedSetId), [sets, selectedSetId]);
   const currentQuestion = selectedSet?.questions[questionIndex];
   
@@ -74,6 +77,13 @@ export default function Home() {
     setAttempts(Array.isArray(savedAttempts) ? savedAttempts : []);
     loadInitialSets();
   }, []);
+
+  useEffect(() => {
+    if (viewMode === "select") {
+      const pool = JSON.parse(localStorage.getItem("quiz.weakPool") || "[]");
+      setWeakPoolCount(pool.length);
+    }
+  }, [viewMode]);
 
   useEffect(() => {
     if (!selectedSet || viewMode === "select" || isSubmitted) return;
@@ -113,14 +123,12 @@ export default function Home() {
     const handleScrollWatcher = () => {
       const currentScrollY = window.scrollY;
       
-      // Only display the floating controller if the user has scrolled down past 300px mid-way
       if (currentScrollY > 300) {
         setShowScrollFAB(true);
       } else {
         setShowScrollFAB(false);
       }
 
-      // Check current structural vector delta path direction loops
       if (currentScrollY > lastScrollY.current) {
         setScrollDirection("down");
       } else {
@@ -197,16 +205,46 @@ export default function Home() {
     }
   }
 
-  // Floating Action Click Event Handler Axis Snaps
   const handleFloatingScrollAction = () => {
     if (scrollDirection === "down") {
-      // Snap smooth viewport down into infinite loading node anchor lines
       infiniteAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     } else {
-      // Snap smooth viewport target back to apex structural header bounds
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
+
+  function startPersonalRecallTest() {
+    const pool = JSON.parse(localStorage.getItem("quiz.weakPool") || "[]");
+    if (pool.length === 0) return;
+
+    const shuffledPool = [...pool];
+    for (let i = shuffledPool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledPool[i], shuffledPool[j]] = [shuffledPool[j], shuffledPool[i]];
+    }
+
+    const randomizedSelection = shuffledPool.slice(0, 15);
+
+    const syntheticRecallSet: QuizSet = {
+      id: "synthetic-personalized-recall-pool",
+      title: "🧠 Random Active Recall Session",
+      description: "A randomized mini-test generated dynamically from your 30 most recent skipped or incorrect questions.",
+      category: "Personal Revision",
+      tags: ["Active Recall", "Spaced Repetition"],
+      questions: randomizedSelection,
+    };
+
+    setSets((prev) => {
+      if (!prev.some(s => s.id === syntheticRecallSet.id)) {
+        return [syntheticRecallSet, ...prev];
+      }
+      return prev.map(s => s.id === syntheticRecallSet.id ? syntheticRecallSet : s);
+    });
+
+    setTimeout(() => {
+      startTest(syntheticRecallSet.id);
+    }, 50);
+  }
 
   async function loadSets() {
     await loadInitialSets();
@@ -269,6 +307,26 @@ export default function Home() {
     setAttempts(nextAttempts);
     localStorage.setItem(attemptKey, JSON.stringify(nextAttempts));
     setIsSubmitted(true);
+
+    const weakQuestionsCollected = selectedSet.questions.filter((question, index) => {
+      const userAnswer = answers[index];
+      const isUnattempted = userAnswer === null || typeof userAnswer === "undefined";
+      const isWrong = !isUnattempted && userAnswer !== question.correctAnswerIndex;
+      return isUnattempted || isWrong;
+    });
+
+    if (weakQuestionsCollected.length > 0) {
+      const existingPool = JSON.parse(localStorage.getItem("quiz.weakPool") || "[]");
+      
+      const uniqueNewQuestions = weakQuestionsCollected.filter(
+        (newQ) => !existingPool.some((oldQ: any) => oldQ.question === newQ.question)
+      );
+
+      const updatedPool = [...uniqueNewQuestions, ...existingPool];
+      const cappedPool = updatedPool.slice(0, 30);
+
+      localStorage.setItem("quiz.weakPool", JSON.stringify(cappedPool));
+    }
   }
 
   async function loginAdmin(event: React.FormEvent) {
@@ -331,9 +389,52 @@ export default function Home() {
         <section className="shell">
           {viewMode === "select" ? (
             <>
+              {/* Highlighted Recall Banner Component with Dynamic Glow Animation */}
+              {weakPoolCount > 0 && (
+                <div className="recallBanner highlightRecallGlow" style={{
+                  background: "linear-gradient(135deg, rgba(147, 51, 234, 0.08) 0%, rgba(236, 72, 153, 0.08) 100%)",
+                  padding: "18px 20px",
+                  borderRadius: "14px",
+                  marginBottom: "24px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "14px",
+                  position: "relative"
+                }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: "1.15rem", fontWeight: "800", color: "#9333ea", display: "flex", alignItems: "center", gap: "8px" }}>
+                      ⚡ Smart Active Revision Available
+                    </h3>
+                    <p style={{ margin: "6px 0 0", fontSize: "0.88rem", fontWeight: "500", color: "#6b7280" }}>
+                      Reviewing your personal mistake pool (<b>{weakPoolCount}/30</b> saved). Ready to spin a fast 15-question random challenge session?
+                    </p>
+                  </div>
+                  <button 
+                    onClick={startPersonalRecallTest}
+                    style={{
+                      background: "linear-gradient(135deg, #9333ea 0%, #ec4899 100%)",
+                      color: "#ffffff",
+                      border: "none",
+                      padding: "12px 20px",
+                      borderRadius: "10px",
+                      fontSize: "0.88rem",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      boxShadow: "0 4px 14px rgba(147, 51, 234, 0.4)",
+                      transition: "transform 0.15s ease"
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.03)"}
+                    onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                  >
+                    Start Recall Challenge ➔
+                  </button>
+                </div>
+              )}
+
               <CandidateDashboard sets={sets} attempts={attempts} status={status} downloadOffline={() => localStorage.setItem(setKey, JSON.stringify(sets))} startTest={startTest} />
               
-              {/* Invisible infinite loader tracking marker anchor row */}
               <div ref={infiniteAnchorRef} style={{ width: "100%", padding: "24px 12px", textAlign: "center", color: "#6b7280", fontSize: "0.9rem", fontWeight: "500" }}>
                 {hasMore ? (loadingMore ? "🔄 Loading next quiz sets..." : "↓ Scroll down to view older tests") : "🎉 Caught up! All available quiz sets loaded."}
               </div>
@@ -412,6 +513,33 @@ export default function Home() {
           {scrollDirection === "down" ? "↓" : "↑"}
         </button>
       )}
+
+      {/* Embedded Global Styles injecting CSS keyframes for highlighting animations */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        .highlightRecallGlow {
+          border: 2px solid #9333ea !important;
+          animation: animatedRecallBorderGlow 3s infinite ease-in-out;
+        }
+
+        html.dark .highlightRecallGlow p {
+          color: #a1a1aa !important;
+        }
+
+        @keyframes animatedRecallBorderGlow {
+          0% {
+            border-color: #9333ea;
+            box-shadow: 0 0 4px rgba(147, 51, 234, 0.15);
+          }
+          50% {
+            border-color: #ec4899;
+            box-shadow: 0 0 16px rgba(236, 72, 153, 0.4);
+          }
+          100% {
+            border-color: #9333ea;
+            box-shadow: 0 0 4px rgba(147, 51, 234, 0.15);
+          }
+        }
+      `}} />
     </main>
   );
 }
