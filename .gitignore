@@ -4,6 +4,7 @@ out
 dist
 .env*.local
 data/sets.json
+data/raw/
 dev-server*.log
 npm-debug.log*
 dev-server.err.log

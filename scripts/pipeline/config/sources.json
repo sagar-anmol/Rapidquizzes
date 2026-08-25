@@ -1,0 +1,398 @@
+{
+  "version": 1,
+  "defaults": {
+    "maxItemsPerSource": 6,
+    "requestTimeoutMs": 20000,
+    "concurrency": 6,
+    "userAgent": "RapidQuizzesBot/1.0 (+https://github.com/sagar-anmol/Rapidquizzes)"
+  },
+  "sources": [
+    {
+      "id": "gktoday",
+      "name": "GKToday",
+      "category": "Exam Prep",
+      "type": "rss",
+      "urls": ["https://www.gktoday.in/feed/"]
+    },
+    {
+      "id": "jagranjosh",
+      "name": "Jagran Josh",
+      "category": "Exam Prep",
+      "type": "html",
+      "urls": ["https://www.jagranjosh.com/current-affairs"],
+      "itemSelector": ".listing-item, article, li"
+    },
+    {
+      "id": "drishti-ias",
+      "name": "Drishti IAS",
+      "category": "Exam Prep",
+      "type": "html",
+      "urls": ["https://www.drishtiias.com/current-affairs"],
+      "itemSelector": ".news-item, article, li"
+    },
+    {
+      "id": "insightsonindia",
+      "name": "Insights on India",
+      "category": "Exam Prep",
+      "type": "rss",
+      "urls": ["https://insightsonindia.com/feed/"]
+    },
+    {
+      "id": "iasbaba",
+      "name": "IASbaba",
+      "category": "Exam Prep",
+      "type": "rss",
+      "urls": ["https://iasbaba.com/feed/"]
+    },
+    {
+      "id": "civilsdaily",
+      "name": "CivilsDaily",
+      "category": "Exam Prep",
+      "type": "rss",
+      "urls": ["https://www.civilsdaily.com/feed/"]
+    },
+    {
+      "id": "clearias",
+      "name": "ClearIAS",
+      "category": "Exam Prep",
+      "type": "rss",
+      "urls": ["https://www.clearias.com/feed/"]
+    },
+    {
+      "id": "pmfias",
+      "name": "PMF IAS",
+      "category": "Environment",
+      "type": "rss",
+      "urls": ["https://www.pmfias.com/feed/"]
+    },
+    {
+      "id": "forumias-blog",
+      "name": "ForumIAS Blog",
+      "category": "Exam Prep",
+      "type": "rss",
+      "urls": ["https://blog.forumias.com/feed/"]
+    },
+    {
+      "id": "affairscloud",
+      "name": "AffairsCloud",
+      "category": "Exam Prep",
+      "type": "rss",
+      "urls": ["https://www.affairscloud.com/feed/"]
+    },
+    {
+      "id": "bankersadda",
+      "name": "BankersAdda",
+      "category": "Exam Prep",
+      "type": "rss",
+      "urls": ["https://www.bankersadda.com/feed/"]
+    },
+    {
+      "id": "adda247-ca",
+      "name": "Adda247 Current Affairs",
+      "category": "Exam Prep",
+      "type": "html",
+      "urls": ["https://currentaffairs.adda247.com/"],
+      "itemSelector": "article, .post-item, h2"
+    },
+    {
+      "id": "testbook-blog",
+      "name": "Testbook Blog",
+      "category": "Exam Prep",
+      "type": "rss",
+      "urls": ["https://testbook.com/blog/feed/"]
+    },
+    {
+      "id": "oliveboard-blog",
+      "name": "Oliveboard Blog",
+      "category": "Exam Prep",
+      "type": "rss",
+      "urls": ["https://www.oliveboard.in/blog/feed/"]
+    },
+    {
+      "id": "careerpower",
+      "name": "Career Power",
+      "category": "Exam Prep",
+      "type": "html",
+      "urls": ["https://www.careerpower.in/current-affairs"],
+      "itemSelector": ".card-body, article, li"
+    },
+    {
+      "id": "fresherslive",
+      "name": "FreshersLive Current Affairs",
+      "category": "Exam Prep",
+      "type": "html",
+      "urls": ["https://www.fresherslive.com/current-affairs"],
+      "itemSelector": ".news-list li, article"
+    },
+    {
+      "id": "indiabix",
+      "name": "IndiaBIX Current Affairs",
+      "category": "Exam Prep",
+      "type": "html",
+      "urls": ["https://www.indiabix.com/current-affairs/"],
+      "itemSelector": ".div-spacer, p"
+    },
+    {
+      "id": "studyiq-blog",
+      "name": "StudyIQ Blog",
+      "category": "Exam Prep",
+      "type": "rss",
+      "urls": ["https://blog.studyiq.com/feed/", "https://www.studyiq.com/feed/"]
+    },
+    {
+      "id": "visionias",
+      "name": "Vision IAS",
+      "category": "Exam Prep",
+      "type": "html",
+      "urls": ["https://visionias.in/current-affairs/todays-current-affairs"],
+      "itemSelector": ".listing-card, .news-item, li"
+    },
+    {
+      "id": "byjus-ias-prep",
+      "name": "BYJU'S Free IAS Prep",
+      "category": "Exam Prep",
+      "type": "html",
+      "urls": ["https://byjus.com/free-ias-prep/"],
+      "itemSelector": "article, .post-title, h3"
+    },
+    {
+      "id": "pib-india",
+      "name": "PIB India",
+      "category": "Government Schemes",
+      "type": "rss",
+      "urls": [
+        "https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=3",
+        "https://pib.gov.in/rssen.xml"
+      ]
+    },
+    {
+      "id": "thehindu-national",
+      "name": "The Hindu National",
+      "category": "National",
+      "type": "rss",
+      "urls": ["https://www.thehindu.com/news/national/feeder/default.rss"]
+    },
+    {
+      "id": "thehindu-international",
+      "name": "The Hindu International",
+      "category": "International",
+      "type": "rss",
+      "urls": ["https://www.thehindu.com/news/international/feeder/default.rss"]
+    },
+    {
+      "id": "thehindu-science",
+      "name": "The Hindu Science",
+      "category": "Science & Technology",
+      "type": "rss",
+      "urls": ["https://www.thehindu.com/sci-tech/science/feeder/default.rss"]
+    },
+    {
+      "id": "thehindu-business",
+      "name": "The Hindu BusinessLine",
+      "category": "Economy",
+      "type": "rss",
+      "urls": ["https://www.thehindubusinessline.com/feeder/default.rss"]
+    },
+    {
+      "id": "indianexpress-india",
+      "name": "Indian Express",
+      "category": "National",
+      "type": "rss",
+      "urls": ["https://indianexpress.com/section/india/feed/"]
+    },
+    {
+      "id": "livemint",
+      "name": "Livemint",
+      "category": "Economy",
+      "type": "rss",
+      "urls": ["https://www.livemint.com/rss/news"]
+    },
+    {
+      "id": "business-standard",
+      "name": "Business Standard",
+      "category": "Economy",
+      "type": "rss",
+      "urls": [
+        "https://www.business-standard.com/rss/home_page_top_stories.rss",
+        "https://www.business-standard.com/rss/latest.rss"
+      ]
+    },
+    {
+      "id": "economic-times",
+      "name": "Economic Times",
+      "category": "Economy",
+      "type": "rss",
+      "urls": ["https://economictimes.indiatimes.com/rssfeedstopstories.cms"]
+    },
+    {
+      "id": "ndtv-india",
+      "name": "NDTV India",
+      "category": "National",
+      "type": "rss",
+      "urls": ["https://feeds.feedburner.com/ndtvnews-india-news"]
+    },
+    {
+      "id": "toi-top",
+      "name": "Times of India",
+      "category": "National",
+      "type": "rss",
+      "urls": ["https://timesofindia.indiatimes.com/rssfeedstopstories.cms"]
+    },
+    {
+      "id": "toi-business",
+      "name": "Times of India Business",
+      "category": "Economy",
+      "type": "rss",
+      "urls": ["https://timesofindia.indiatimes.com/rssfeeds/1898055.cms"]
+    },
+    {
+      "id": "hindustantimes",
+      "name": "Hindustan Times",
+      "category": "National",
+      "type": "rss",
+      "urls": [
+        "https://www.hindustantimes.com/feeds/rss/topnews/rssfeed.xml",
+        "https://www.hindustantimes.com/rss/topnews/rssfeed.xml"
+      ]
+    },
+    {
+      "id": "indiatoday",
+      "name": "India Today",
+      "category": "National",
+      "type": "rss",
+      "urls": ["https://www.indiatoday.in/rss.xml", "https://feeds.feedburner.com/it-in"]
+    },
+    {
+      "id": "news18-india",
+      "name": "News18 India",
+      "category": "National",
+      "type": "rss",
+      "urls": ["https://www.news18.com/commonfeeds/v1/cne/rss/india.xml"]
+    },
+    {
+      "id": "zeenews-india",
+      "name": "Zee News",
+      "category": "National",
+      "type": "rss",
+      "urls": ["https://zeenews.india.com/rss/india-national-news.xml"]
+    },
+    {
+      "id": "zeenews-world",
+      "name": "Zee News World",
+      "category": "International",
+      "type": "rss",
+      "urls": ["https://zeenews.india.com/rss/world-news.xml"]
+    },
+    {
+      "id": "firstpost",
+      "name": "Firstpost",
+      "category": "National",
+      "type": "rss",
+      "urls": ["https://www.firstpost.com/category/india/feed", "https://www.firstpost.com/feed"]
+    },
+    {
+      "id": "thewire",
+      "name": "The Wire",
+      "category": "National",
+      "type": "rss",
+      "urls": ["https://thewire.in/feed"]
+    },
+    {
+      "id": "scroll-in",
+      "name": "Scroll.in",
+      "category": "National",
+      "type": "rss",
+      "urls": ["https://scroll.in/feed/rss"]
+    },
+    {
+      "id": "downtoearth",
+      "name": "Down To Earth",
+      "category": "Environment",
+      "type": "rss",
+      "urls": ["https://www.downtoearth.org.in/feed"]
+    },
+    {
+      "id": "frontline",
+      "name": "Frontline",
+      "category": "National",
+      "type": "rss",
+      "urls": ["https://frontline.thehindu.com/feeder/default.rss"]
+    },
+    {
+      "id": "moneycontrol",
+      "name": "Moneycontrol",
+      "category": "Economy",
+      "type": "rss",
+      "urls": [
+        "https://www.moneycontrol.com/rss/latestnews.xml",
+        "https://www.moneycontrol.com/rss/business.xml"
+      ]
+    },
+    {
+      "id": "financialexpress",
+      "name": "Financial Express",
+      "category": "Economy",
+      "type": "rss",
+      "urls": ["https://www.financialexpress.com/feed/"]
+    },
+    {
+      "id": "deccanherald",
+      "name": "Deccan Herald",
+      "category": "National",
+      "type": "rss",
+      "urls": [
+        "https://www.deccanherald.com/rss/national.rss",
+        "https://rss.deccanherald.com/national"
+      ]
+    },
+    {
+      "id": "freepressjournal",
+      "name": "Free Press Journal",
+      "category": "National",
+      "type": "rss",
+      "urls": ["https://www.freepressjournal.com/feed"]
+    },
+    {
+      "id": "espncricinfo",
+      "name": "ESPN Cricinfo",
+      "category": "Sports",
+      "type": "rss",
+      "urls": ["https://www.espncricinfo.com/rss/content/story/feeds/0.xml"]
+    },
+    {
+      "id": "bbc-south-asia",
+      "name": "BBC South Asia",
+      "category": "International",
+      "type": "rss",
+      "urls": ["https://feeds.bbci.co.uk/news/world/south_asia/rss.xml"]
+    },
+    {
+      "id": "aljazeera",
+      "name": "Al Jazeera",
+      "category": "International",
+      "type": "rss",
+      "urls": ["https://www.aljazeera.com/xml/rss/all.xml"]
+    },
+    {
+      "id": "guardian-world",
+      "name": "The Guardian World",
+      "category": "International",
+      "type": "rss",
+      "urls": ["https://www.theguardian.com/world/rss"]
+    },
+    {
+      "id": "phys-org",
+      "name": "Phys.org",
+      "category": "Science & Technology",
+      "type": "rss",
+      "urls": ["https://phys.org/rss-feed/"]
+    },
+    {
+      "id": "sciencedaily",
+      "name": "ScienceDaily",
+      "category": "Science & Technology",
+      "type": "rss",
+      "urls": ["https://www.sciencedaily.com/rss/top/science.xml"]
+    }
+  ]
+}

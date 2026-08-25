@@ -1,0 +1,59 @@
+name: Generate Daily Quiz Set
+
+on:
+  schedule:
+    - cron: "0 */12 * * *"
+  workflow_dispatch:
+    inputs:
+      questions:
+        description: "Questions per set"
+        required: false
+        default: "30"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: quiz-generation
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run generation pipeline
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: stealth/ox-alpha
+          OPENROUTER_BASE_URL: https://openrouter.ai/api/v1
+        run: node scripts/pipeline/run.js --questions=${{ github.event.inputs.questions || '30' }}
+
+      - name: Push set to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/pipeline/push-supabase.js
+
+      - name: Commit generated set
+        run: |
+          git config user.name "rapidquizzes-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/generated
+          if git diff --cached --quiet; then
+            echo "Nothing new to commit."
+          else
+            git commit -m "chore(auto): daily quiz set $(date -u +%Y-%m-%d)"
+            git push
+          fi

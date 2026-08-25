@@ -1,46 +1,26 @@
 import { NextResponse } from "next/server";
-import { createHmac } from "crypto";
 import { listSets, normalizeSet, upsertSets } from "./store";
+import { getRoleForToken } from "@/lib/supabase";
 
-// FORCE NEXT.JS TO EVALUATE THIS ROUTE FRESH EVERY TIME (NO CACHING)
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-function expectedToken() {
-  const id = process.env.ADMIN_ID ?? "";
-  const password = process.env.ADMIN_PASSWORD ?? "";
-  const secret = process.env.ADMIN_SESSION_SECRET ?? "local-dev-secret";
-  return createHmac("sha256", secret).update(`${id}:${password}`).digest("hex");
-}
-
-function isAdmin(request: Request) {
-  return request.headers.get("x-admin-token") === expectedToken();
+async function isAdminRequest(request: Request) {
+  const header = request.headers.get("authorization") ?? "";
+  const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+  if (!token) return false;
+  try {
+    return (await getRoleForToken(token)) === "admin";
+  } catch {
+    return false;
+  }
 }
 
 export async function GET(request: Request) {
-  const referer = request.headers.get("referer") || "";
-  
-  // Permanent production domain safety checkpoint
-  const allowedHost = "www.modhub.eu.org";
-
-  // BULLETPROOF ORIGIN SECURITY GATE:
-  // Direct browser link access or external site frames are completely rejected.
-  // Authenticated scrapper scripts/admin sessions are automatically bypassed.
-  if (!isAdmin(request)) {
-    if (!referer || !referer.includes(allowedHost)) {
-      return NextResponse.json(
-        { error: "Access Denied. Direct data access outside the application environment is forbidden." },
-        { 
-          status: 403,
-          headers: { "Cache-Control": "no-store, max-age=0, must-revalidate" } 
-        }
-      );
-    }
-  }
-
   const { searchParams } = new URL(request.url);
   const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
-  const limit = 5;
+  const limitParam = Math.max(1, Number(searchParams.get("limit") ?? "5"));
+  const limit = Math.min(50, limitParam);
 
   const { sets, total } = await listSets(page, limit);
 
@@ -59,7 +39,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!isAdmin(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Admin login required" }, { status: 401 });
   }
 

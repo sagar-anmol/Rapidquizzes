@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { QuizSet, Attempt, Answer, ViewMode, AppMode } from "@/components/types";
 import CandidateDashboard from "@/components/CandidateDashboard";
 import QuizEngine from "@/components/QuizEngine";
+import AuthPanel from "@/components/AuthPanel";
+import { isSupabaseBrowserConfigured, supabaseBrowser } from "@/lib/supabase-browser";
 
 const sampleJson = `{
   "title": "June 1, 2026 Current Affairs",
@@ -24,7 +26,6 @@ const sampleJson = `{
 const setKey = "quiz.offlineSets";
 const attemptKey = "quiz.attempts";
 const progressKey = "quiz.progress";
-const tokenKey = "quiz.adminToken";
 
 export default function Home() {
   const [sets, setSets] = useState<QuizSet[]>([]);
@@ -36,9 +37,10 @@ export default function Home() {
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [status, setStatus] = useState("Loading quiz sets...");
   const [appMode, setAppMode] = useState<AppMode>("candidate");
-  const [adminToken, setAdminToken] = useState("");
-  const [adminId, setAdminId] = useState("");
-  const [adminPassword, setAdminPassword] = useState("");
+
+  const [sessionEmail, setSessionEmail] = useState("");
+  const [userRole, setUserRole] = useState("");
+  const [showAuth, setShowAuth] = useState(false);
   const [jsonInput, setJsonInput] = useState(sampleJson);
   const [adminPage, setAdminPage] = useState(1);
   const [adminSets, setAdminSets] = useState<QuizSet[]>([]);
@@ -71,12 +73,41 @@ export default function Home() {
   const markedCount = selectedSet ? selectedSet.questions.filter((_, idx) => Boolean(marked[idx])).length : 0;
 
   useEffect(() => {
-    const savedToken = localStorage.getItem(tokenKey) ?? "";
     const savedAttempts = JSON.parse(localStorage.getItem(attemptKey) ?? "[]");
-    setAdminToken(savedToken);
     setAttempts(Array.isArray(savedAttempts) ? savedAttempts : []);
     loadInitialSets();
+    setupAuth();
   }, []);
+
+  async function setupAuth() {
+    if (!isSupabaseBrowserConfigured()) return;
+    const client = supabaseBrowser();
+
+    async function applySession() {
+      const { data } = await client.auth.getSession();
+      const session = data.session;
+      if (!session) {
+        setSessionEmail("");
+        setUserRole("");
+        setAppMode("candidate");
+        return;
+      }
+      setSessionEmail(session.user.email ?? "");
+      const { data: profileData } = await client
+        .from("profiles")
+        .select("role")
+        .eq("id", session.user.id)
+        .single();
+      const profile = profileData as unknown as { role?: string } | null;
+      setUserRole(profile?.role ?? "candidate");
+    }
+
+    await applySession();
+
+    client.auth.onAuthStateChange(() => {
+      applySession();
+    });
+  }
 
   useEffect(() => {
     if (viewMode === "select") {
@@ -135,7 +166,7 @@ export default function Home() {
         setScrollDirection("up");
       }
       
-      lastScrollY.current = currentScrollY;
+      lastScrollY.current = window.scrollY;
     };
 
     window.addEventListener("scroll", handleScrollWatcher, { passive: true });
@@ -247,10 +278,6 @@ export default function Home() {
     }, 50);
   }
 
-  async function loadSets() {
-    await loadInitialSets();
-  }
-
   async function loadAdminSets(page = adminPage) {
     const response = await fetch(`/api/sets?page=${page}&limit=5`, { cache: "no-store" });
     const data = await response.json();
@@ -341,23 +368,23 @@ export default function Home() {
     }
   }
 
-  async function loginAdmin(event: React.FormEvent) {
-    event.preventDefault();
-    setMessage("Checking admin login...");
-    const response = await fetch("/api/admin/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: adminId, password: adminPassword })
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      setMessage(data.error ?? "Login failed");
-      return;
-    }
-    const token = data.token;
-    setAdminToken(token);
-    localStorage.setItem(tokenKey, token);
-    setMessage("Admin panel unlocked");
+  async function getAccessToken(): Promise<string> {
+    const client = supabaseBrowser();
+    const { data } = await client.auth.getSession();
+    return data.session?.access_token ?? "";
+  }
+
+  async function signOut() {
+    await supabaseBrowser().auth.signOut();
+    setSessionEmail("");
+    setUserRole("");
+    setAppMode("candidate");
+    setMessage("");
+  }
+
+  async function openAdminPanel() {
+    setAppMode("admin");
+    setMessage("");
     loadAdminSets(1);
   }
 
@@ -368,9 +395,10 @@ export default function Home() {
       setMessage("JSON is not valid. Check commas and quotes.");
       return;
     }
+    const token = await getAccessToken();
     const response = await fetch("/api/sets", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-admin-token": adminToken },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify(parsed)
     });
     const data = await response.json();
@@ -391,9 +419,19 @@ export default function Home() {
           <h1>{appMode === "admin" ? "Management" : "Current Affairs & Online Tests"}</h1>
         </div>
         <div className="topActions">
-          <button className="ghost" onClick={() => { setAppMode(appMode === "admin" ? "candidate" : "admin"); setMessage(""); if(appMode !== "admin" && adminToken) loadAdminSets(1); }}>
-            {appMode === "admin" ? "Candidate view" : "Admin"}
-          </button>
+          {sessionEmail ? (
+            <>
+              <span className="muted" style={{ fontSize: "0.85rem", alignSelf: "center" }}>{sessionEmail}</span>
+              {userRole === "admin" && (
+                <button className="ghost" onClick={() => { if (appMode === "admin") { setAppMode("candidate"); } else { openAdminPanel(); } }}>
+                  {appMode === "admin" ? "Candidate view" : "Admin"}
+                </button>
+              )}
+              <button className="ghost" onClick={signOut}>Sign out</button>
+            </>
+          ) : (
+            <button className="ghost" onClick={() => setShowAuth(true)}>Log in / Sign up</button>
+          )}
         </div>
       </header>
 
@@ -491,40 +529,42 @@ export default function Home() {
         </section>
       )}
 
-      {appMode === "admin" && (
+      {appMode === "admin" && userRole === "admin" && (
         <section className="adminScreen">
           <div className="adminHero">
             <div>
               <h2>Management</h2>
               <p className="muted">made to make life easy</p>
             </div>
-            {adminToken && <span className="adminBadge">Authenticated</span>}
+            <span className="adminBadge">Admin · {sessionEmail}</span>
           </div>
 
-          {!adminToken ? (
-            <form className="loginCard" onSubmit={loginAdmin}>
-              <label>Admin ID <input value={adminId} onChange={(e) => setAdminId(e.target.value)} /></label>
-              <label>Password <input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} /></label>
-              <button type="submit">Login</button>
-            </form>
-          ) : (
-            <div className="adminGrid">
-              <section className="adminEditor">
-                <textarea value={jsonInput} onChange={(e) => setJsonInput(e.target.value)} />
-                <div className="adminActions"><button onClick={uploadJson}>Publish Set</button></div>
-              </section>
-              <aside className="adminList">
-                {adminSets.map((set) => <div className="attempt" key={set.id}><span>{set.title}</span> <strong>{set.questions.length}</strong></div>)}
-                <div className="pager">
-                  <button disabled={adminPage <= 1} onClick={() => loadAdminSets(adminPage - 1)}>Prev</button>
-                  <span>{adminPage}/{adminTotalPages}</span>
-                  <button disabled={adminPage >= adminTotalPages} onClick={() => loadAdminSets(adminPage + 1)}>Next</button>
-                </div>
-              </aside>
-            </div>
-          )}
+          <div className="adminGrid">
+            <section className="adminEditor">
+              <textarea value={jsonInput} onChange={(e) => setJsonInput(e.target.value)} />
+              <div className="adminActions"><button onClick={uploadJson}>Publish Set</button></div>
+            </section>
+            <aside className="adminList">
+              {adminSets.map((set) => <div className="attempt" key={set.id}><span>{set.title}</span> <strong>{set.questions.length}</strong></div>)}
+              <div className="pager">
+                <button disabled={adminPage <= 1} onClick={() => loadAdminSets(adminPage - 1)}>Prev</button>
+                <span>{adminPage}/{adminTotalPages}</span>
+                <button disabled={adminPage >= adminTotalPages} onClick={() => loadAdminSets(adminPage + 1)}>Next</button>
+              </div>
+            </aside>
+          </div>
           {message && <p className="message">{message}</p>}
         </section>
+      )}
+
+      {showAuth && (
+        <AuthPanel
+          onCancel={() => setShowAuth(false)}
+          onAuthed={() => {
+            setShowAuth(false);
+            setMessage("");
+          }}
+        />
       )}
 
       {/* Dynamic Circular Directional Floating Action Button */}

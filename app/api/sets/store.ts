@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { hasMongoConfig, quizSetsCollection } from "./mongo";
+import { hasSupabaseServiceConfig, supabaseAdmin } from "@/lib/supabase";
 
 // 1. Updated Type Definitions to match your preferred schema
 export type QuizQuestion = {
@@ -66,6 +67,17 @@ export async function readSets(): Promise<QuizSet[]> {
     return sets.length ? (sets as QuizSet[]) : starterSets;
   }
 
+  if (hasSupabaseServiceConfig()) {
+    const client = supabaseAdmin();
+    const { data, error } = await client
+      .from("quiz_sets")
+      .select("data")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    const sets = (data ?? []).map((row) => row.data as QuizSet);
+    return sets.length ? sets : starterSets;
+  }
+
   try {
     const raw = await readFile(dataFile, "utf8");
     const parsed = JSON.parse(raw);
@@ -92,6 +104,18 @@ export async function writeSets(sets: QuizSet[]) {
     return;
   }
 
+  if (hasSupabaseServiceConfig()) {
+    const client = supabaseAdmin();
+    const rows = sets.map((set) => ({ id: set.id, data: set }));
+    if (rows.length) {
+      const { error } = await client
+        .from("quiz_sets")
+        .upsert(rows, { onConflict: "id" });
+      if (error) throw new Error(error.message);
+    }
+    return;
+  }
+
   await mkdir(dataDir, { recursive: true });
   await writeFile(dataFile, JSON.stringify(sets, null, 2), "utf8");
 }
@@ -107,6 +131,25 @@ export async function listSets(page: number, limit: number) {
       .limit(limit)
       .toArray();
 
+    return {
+      sets: sets.length ? sets : page === 1 ? starterSets.slice(0, limit) : [],
+      total: Math.max(total, sets.length ? total : starterSets.length)
+    };
+  }
+
+  if (hasSupabaseServiceConfig()) {
+    const client = supabaseAdmin();
+    const from = (page - 1) * limit;
+    const [{ count }, { data }] = await Promise.all([
+      client.from("quiz_sets").select("*", { count: "exact", head: true }),
+      client
+        .from("quiz_sets")
+        .select("data")
+        .order("created_at", { ascending: false })
+        .range(from, from + limit - 1)
+    ]);
+    const sets = (data ?? []).map((row) => row.data as QuizSet);
+    const total = count ?? 0;
     return {
       sets: sets.length ? sets : page === 1 ? starterSets.slice(0, limit) : [],
       total: Math.max(total, sets.length ? total : starterSets.length)
@@ -136,6 +179,16 @@ export async function upsertSets(newSets: QuizSet[]) {
         }
       }))
     );
+    return;
+  }
+
+  if (hasSupabaseServiceConfig()) {
+    const client = supabaseAdmin();
+    const rows = newSets.map((set) => ({ id: set.id, data: set }));
+    const { error } = await client
+      .from("quiz_sets")
+      .upsert(rows, { onConflict: "id" });
+    if (error) throw new Error(error.message);
     return;
   }
 
