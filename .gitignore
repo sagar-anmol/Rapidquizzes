@@ -12,3 +12,5 @@ dev-server.log
 
 *.log
 *.err.log
+.vercel
+.env*
